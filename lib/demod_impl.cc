@@ -25,7 +25,7 @@
 #include <gnuradio/io_signature.h>
 #include "demod_impl.h"
 
-#define DEBUG_OFF     0
+#define DEBUG_OFF     2
 #define DEBUG_INFO    1
 #define DEBUG_VERBOSE 2
 #define DEBUG         DEBUG_OFF
@@ -99,7 +99,7 @@ namespace gr {
         // calculate the total number of symbols in a packet
         d_packet_symbol_len = 8 + std::max((4+d_cr)*(int)std::ceil((2.0*d_payload_len-d_sf+7+4*d_crc-5*!d_header)/(d_sf-2*d_ldr)), 0);
       }
-
+    
       d_header_port = pmt::mp("header");
       message_port_register_in(d_header_port);
       d_out_port = pmt::mp("out");
@@ -126,7 +126,6 @@ namespace gr {
         d_downchirp.push_back(gr_complex(std::polar(1.0, phase)));
         d_upchirp.push_back(gr_complex(std::polar(1.0, -phase)));
       }
-
       set_history(DEMOD_HISTORY_DEPTH*d_num_samples);  // Sync is 2.25 chirp periods long
     }
 
@@ -401,8 +400,8 @@ namespace gr {
       }
 
 
-
       // Looks for the same symbol appearing consecutively, signifying the LoRa preamble
+
       case S_DETECT_PREAMBLE:
       {
         d_preamble_idx = d_argmax_history[0];
@@ -415,6 +414,7 @@ namespace gr {
         preamble_found = true;
         for (int i = 1; i < REQUIRED_PREAMBLE_CHIRPS; i++)
         {
+          // 只需要 d_argmax_history 数组中的元素与d_argmax_history[0]相差在dis之内即可
           uint32_t dis = gr::lora::pmod(int(d_preamble_idx) - int(d_argmax_history[i]), d_bin_size);
           if (dis > d_preamble_drift_max && dis < d_bin_size-d_preamble_drift_max)
           {
@@ -470,6 +470,7 @@ namespace gr {
         d_fft->execute();
 
         // Take argmax of downchirp FFT
+        // 此时位于第一个 SFD 处
         max_idx_sfd = search_fft_peak(d_fft->get_outbuf(), fft_res_mag, fft_res_add, fft_res_add_c, &max_val_sfd);
 
         // If SFD is detected
@@ -477,6 +478,7 @@ namespace gr {
         {
           int idx = max_idx_sfd;
           if (max_idx_sfd > d_bin_size / 2) {
+            // 当窗口位于第1个SFD和2个SFD chirp 之间时，max_idx_sfd > d_bin_size/2，所以减去d_bin_size得到负值，从而进行窗口回退
             idx = max_idx_sfd - d_bin_size;
           }
           num_consumed = (int)round(2.25*d_num_samples + d_p*idx/2.0/d_fft_size_factor);

@@ -243,10 +243,11 @@ namespace gr {
     void
     decode_impl::print_payload(std::vector<unsigned char> &payload)
     {
-      std::cout << "Received LoRa packet (hex): ";
+      std::cout << "Received LoRa packet : ";
       for (int i = 0; i < payload.size(); i++)
       {
-        std::cout << std::hex << (uint32_t)payload[i] << " ";
+        // std::cout << std::hex << (uint32_t)payload[i] << " ";
+        std::cout << (char)payload[i];
       }
       std::cout << std::endl;
     }
@@ -409,7 +410,7 @@ namespace gr {
         uint16_t checksum = combined_bytes[d_payload_len+offset] | (combined_bytes[d_payload_len+offset+1] << 8);
         combined_bytes.push_back(checksum == gr::lora::data_checksum(&combined_bytes[offset], d_payload_len));
       }
-
+      print_payload(combined_bytes);
       pmt::pmt_t output = pmt::init_u8vector(combined_bytes.size(), combined_bytes);
 
 #else // Whitening sequence derivation

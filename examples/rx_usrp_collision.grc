@@ -8,7 +8,7 @@ options:
     description: ''
     gen_cmake: 'On'
     gen_linking: dynamic
-    generate_options: qt_gui
+    generate_options: no_gui
     hier_block_src_path: '.:'
     id: rx_usrp
     max_nouts: '0'
@@ -36,7 +36,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: 500e3/4
+    value: 250e3
   states:
     bus_sink: false
     bus_source: false
@@ -48,7 +48,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '4'
+    value: '3'
   states:
     bus_sink: false
     bus_source: false
@@ -72,7 +72,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: 470e6
+    value: 868e6
   states:
     bus_sink: false
     bus_source: false
@@ -132,7 +132,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '8'
+    value: '7'
   states:
     bus_sink: false
     bus_source: false
@@ -152,7 +152,7 @@ blocks:
     bus_structure: null
     coordinate: [1385, 169]
     rotation: 0
-    state: enabled
+    state: disabled
 - name: blocks_message_debug_0_0
   id: blocks_message_debug
   parameters:
@@ -416,9 +416,9 @@ blocks:
     dc_offs_enb7: '""'
     dc_offs_enb8: '""'
     dc_offs_enb9: '""'
-    dev_addr: addr=192.168.10.4
+    dev_addr: ''
     dev_args: ''
-    gain0: '10'
+    gain0: '60'
     gain1: '0'
     gain10: '0'
     gain11: '0'
@@ -625,6 +625,7 @@ blocks:
     sd_spec6: ''
     sd_spec7: ''
     show_lo_controls: 'False'
+    start_time: '-1.0'
     stream_args: ''
     stream_chans: '[]'
     sync: none

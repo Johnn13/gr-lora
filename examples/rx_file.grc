@@ -36,7 +36,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: 500e3/4
+    value: 250e3
   states:
     bus_sink: false
     bus_source: false
@@ -48,7 +48,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '4'
+    value: '1'
   states:
     bus_sink: false
     bus_source: false
@@ -120,7 +120,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: 1e6
+    value: 500e3
   states:
     bus_sink: false
     bus_source: false
@@ -132,7 +132,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '8'
+    value: '7'
   states:
     bus_sink: false
     bus_source: false
@@ -147,7 +147,7 @@ blocks:
     alias: ''
     begin_tag: pmt.PMT_NIL
     comment: ''
-    file: /src/signals/sf8_bw125_cr45
+    file: /home/jm/ideal_signal/470_sf7_fs500_bw250_cr1_hascrc_hasheader.cfile
     length: '0'
     maxoutbuf: '0'
     minoutbuf: '0'
@@ -187,7 +187,7 @@ blocks:
     bus_structure: null
     coordinate: [1127, 109]
     rotation: 0
-    state: disabled
+    state: enabled
 - name: blocks_socket_pdu_0
   id: blocks_socket_pdu
   parameters:
@@ -208,6 +208,25 @@ blocks:
     coordinate: [1378, 360]
     rotation: 0
     state: enabled
+- name: blocks_throttle_0
+  id: blocks_throttle
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: ''
+    ignoretag: 'True'
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    samples_per_second: samp_rate
+    type: complex
+    vlen: '1'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [296, 452.0]
+    rotation: 0
+    state: disabled
 - name: lora_decode_0
   id: lora_decode
   parameters:

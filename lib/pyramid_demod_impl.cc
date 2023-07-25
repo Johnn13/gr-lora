@@ -74,7 +74,7 @@ namespace gr {
         d_threshold(threshold)
     {
       assert((d_sf > 5) && (d_sf < 13));
-      if (d_sf == 6) assert(!header);
+      // if (d_sf == 6) assert(!header);
       assert(d_fft_size_factor > 0);
       assert(((int)fs_bw_ratio) == fs_bw_ratio);
       d_p = (int) fs_bw_ratio;
