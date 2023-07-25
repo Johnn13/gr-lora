@@ -25,7 +25,7 @@
 #include <gnuradio/io_signature.h>
 #include "demod_impl.h"
 
-#define DEBUG_OFF     2
+#define DEBUG_OFF     0
 #define DEBUG_INFO    1
 #define DEBUG_VERBOSE 2
 #define DEBUG         DEBUG_OFF

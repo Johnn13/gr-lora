@@ -243,13 +243,16 @@ namespace gr {
     void
     decode_impl::print_payload(std::vector<unsigned char> &payload)
     {
+      
+      std::cout << std::endl;
       std::cout << "Received LoRa packet : ";
       for (int i = 0; i < payload.size(); i++)
       {
         // std::cout << std::hex << (uint32_t)payload[i] << " ";
         std::cout << (char)payload[i];
       }
-      std::cout << std::endl;
+      std::cout << "\n" << "========================" << std::endl;
+      std::cout << "\n" << std::endl;
     }
 
     void
@@ -290,12 +293,14 @@ namespace gr {
       std::vector<unsigned char> codewords;
       std::vector<unsigned char> nibbles;
       std::vector<unsigned char> combined_bytes;
+      std::vector<unsigned char> payload_bytes;
 
       short bin_offset = 0;
       uint16_t last_rem;
       uint16_t this_rem;
 
       symbols_in.clear();
+      payload_bytes.clear();
 
       for (int i = 0; i < pkt_len; i++)
       {
@@ -378,7 +383,8 @@ namespace gr {
       {
         return; // TODO report broken packet
       }
-      for (uint32_t i = 0; i < min_len; i+=2)
+      // 这段代码是将汉明解码后的nibbles数组合并成字节数组combined_bytes
+      for (uint32_t i = 0; i < min_len; i+=2) 
       {
         if (d_header && i < 6)
         {
@@ -408,9 +414,19 @@ namespace gr {
       {
         int offset = d_header ? 3 : 0;
         uint16_t checksum = combined_bytes[d_payload_len+offset] | (combined_bytes[d_payload_len+offset+1] << 8);
-        combined_bytes.push_back(checksum == gr::lora::data_checksum(&combined_bytes[offset], d_payload_len));
+        uint16_t crc_valid = (checksum == gr::lora::data_checksum(&combined_bytes[offset], d_payload_len));
+        combined_bytes.push_back(crc_valid);
+        if (!crc_valid)
+          std::cout << "CRC invalid!" << std::endl;
+        else
+        {
+          std::cout <<'\n' << "========================" << std::endl;
+          std::cout << "CRC valid!" << std::endl;
+          for(int i = offset; i < d_payload_len+offset; ++i)
+            payload_bytes.push_back(combined_bytes[i]);
+        }
       }
-      print_payload(combined_bytes);
+      print_payload(payload_bytes);
       pmt::pmt_t output = pmt::init_u8vector(combined_bytes.size(), combined_bytes);
 
 #else // Whitening sequence derivation

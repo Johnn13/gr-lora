@@ -8,7 +8,7 @@ options:
     description: ''
     gen_cmake: 'On'
     gen_linking: dynamic
-    generate_options: qt_gui
+    generate_options: no_gui
     hier_block_src_path: '.:'
     id: rx_usrp
     max_nouts: '0'
@@ -159,7 +159,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [11, 320]
+    coordinate: [40, 332.0]
     rotation: 0
     state: enabled
 - name: blocks_message_debug_0
@@ -172,9 +172,9 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1398, 176]
+    coordinate: [1408, 176.0]
     rotation: 0
-    state: enabled
+    state: disabled
 - name: blocks_message_debug_0_0
   id: blocks_message_debug
   parameters:
@@ -187,7 +187,7 @@ blocks:
     bus_structure: null
     coordinate: [1127, 109]
     rotation: 0
-    state: enabled
+    state: disabled
 - name: blocks_socket_pdu_0
   id: blocks_socket_pdu
   parameters:

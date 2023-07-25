@@ -5,11 +5,12 @@
 # SPDX-License-Identifier: GPL-3.0
 #
 # GNU Radio Python Flow Graph
-# Title: Rx USRP
+# Title: Rx File
 # Author: jkadbear
 # GNU Radio version: v3.8.5.0-6-g57bd109d
 
 from gnuradio import blocks
+import pmt
 from gnuradio import filter
 from gnuradio.filter import firdes
 from gnuradio import gr
@@ -18,8 +19,6 @@ import signal
 from argparse import ArgumentParser
 from gnuradio.eng_arg import eng_float, intx
 from gnuradio import eng_notation
-from gnuradio import uhd
-import time
 from gnuradio.filter import pfb
 import lora
 
@@ -27,38 +26,24 @@ import lora
 class rx_usrp(gr.top_block):
 
     def __init__(self):
-        gr.top_block.__init__(self, "Rx USRP")
+        gr.top_block.__init__(self, "Rx File")
 
         ##################################################
         # Variables
         ##################################################
         self.sf = sf = 7
-        self.bw = bw = 250000
-        self.samp_rate = samp_rate = 1e6
+        self.bw = bw = 250e3
+        self.samp_rate = samp_rate = 500e3
         self.payload_len = payload_len = 8
         self.ldr = ldr = 2**sf/bw > 16e-3
         self.header = header = True
-        self.freq = freq = 868e6
+        self.freq = freq = 470e6
         self.crc = crc = True
-        self.cr = cr = 3
+        self.cr = cr = 1
 
         ##################################################
         # Blocks
         ##################################################
-        self.uhd_usrp_source_0 = uhd.usrp_source(
-            ",".join(('', "")),
-            uhd.stream_args(
-                cpu_format="fc32",
-                args='',
-                channels=list(range(0,1)),
-            ),
-        )
-        self.uhd_usrp_source_0.set_center_freq(freq, 0)
-        self.uhd_usrp_source_0.set_gain(60, 0)
-        self.uhd_usrp_source_0.set_antenna('RX2', 0)
-        self.uhd_usrp_source_0.set_bandwidth(bw, 0)
-        self.uhd_usrp_source_0.set_samp_rate(samp_rate)
-        # No synchronization enforced.
         self.pfb_arb_resampler_xxx_0 = pfb.arb_resampler_ccf(
             2*bw/samp_rate,
             taps=None,
@@ -73,20 +58,22 @@ class rx_usrp(gr.top_block):
                 1e3,
                 firdes.WIN_RECTANGULAR,
                 6.76))
-        self.lora_demod_0 = lora.demod(sf, header, payload_len, cr, crc, ldr, 25.0, 16, 0, 4, 2)
+        self.lora_demod_1 = lora.demod(sf, header, payload_len, cr, crc, ldr, 25.0, 8, 0, 4, 2)
         self.lora_decode_0 = lora.decode(sf, header, payload_len, cr, crc, ldr)
         self.blocks_socket_pdu_0 = blocks.socket_pdu('UDP_CLIENT', '127.0.0.1', '52002', 10000, False)
+        self.blocks_file_source_0 = blocks.file_source(gr.sizeof_gr_complex*1, '/home/jm/ideal_signal/470_sf7_fs500_bw250_cr1_hascrc_hasheader.cfile', False, 0, 0)
+        self.blocks_file_source_0.set_begin_tag(pmt.PMT_NIL)
 
 
         ##################################################
         # Connections
         ##################################################
         self.msg_connect((self.lora_decode_0, 'out'), (self.blocks_socket_pdu_0, 'pdus'))
-        self.msg_connect((self.lora_decode_0, 'header'), (self.lora_demod_0, 'header'))
-        self.msg_connect((self.lora_demod_0, 'out'), (self.lora_decode_0, 'in'))
+        self.msg_connect((self.lora_decode_0, 'header'), (self.lora_demod_1, 'header'))
+        self.msg_connect((self.lora_demod_1, 'out'), (self.lora_decode_0, 'in'))
+        self.connect((self.blocks_file_source_0, 0), (self.low_pass_filter_0, 0))
         self.connect((self.low_pass_filter_0, 0), (self.pfb_arb_resampler_xxx_0, 0))
-        self.connect((self.pfb_arb_resampler_xxx_0, 0), (self.lora_demod_0, 0))
-        self.connect((self.uhd_usrp_source_0, 0), (self.low_pass_filter_0, 0))
+        self.connect((self.pfb_arb_resampler_xxx_0, 0), (self.lora_demod_1, 0))
 
 
     def get_sf(self):
@@ -104,7 +91,6 @@ class rx_usrp(gr.top_block):
         self.set_ldr(2**self.sf/self.bw > 16e-3)
         self.low_pass_filter_0.set_taps(firdes.low_pass(1, self.samp_rate, self.bw/2+10e3, 1e3, firdes.WIN_RECTANGULAR, 6.76))
         self.pfb_arb_resampler_xxx_0.set_rate(2*self.bw/self.samp_rate)
-        self.uhd_usrp_source_0.set_bandwidth(self.bw, 0)
 
     def get_samp_rate(self):
         return self.samp_rate
@@ -113,7 +99,6 @@ class rx_usrp(gr.top_block):
         self.samp_rate = samp_rate
         self.low_pass_filter_0.set_taps(firdes.low_pass(1, self.samp_rate, self.bw/2+10e3, 1e3, firdes.WIN_RECTANGULAR, 6.76))
         self.pfb_arb_resampler_xxx_0.set_rate(2*self.bw/self.samp_rate)
-        self.uhd_usrp_source_0.set_samp_rate(self.samp_rate)
 
     def get_payload_len(self):
         return self.payload_len
@@ -138,7 +123,6 @@ class rx_usrp(gr.top_block):
 
     def set_freq(self, freq):
         self.freq = freq
-        self.uhd_usrp_source_0.set_center_freq(self.freq, 0)
 
     def get_crc(self):
         return self.crc
