@@ -44,6 +44,7 @@ namespace gr {
                  uint8_t   payload_len,
                  uint8_t   cr,
                  bool      crc,
+                 uint8_t   dw_size,
                  bool      low_data_rate,
                  float     beta,
                  uint16_t  fft_factor,
@@ -52,7 +53,7 @@ namespace gr {
                  float     fs_bw_ratio)
     {
       return gnuradio::get_initial_sptr
-        (new demod_impl(spreading_factor, header, payload_len, cr, crc, low_data_rate, beta, fft_factor, peak_search_algorithm, peak_search_phase_k, fs_bw_ratio));
+        (new demod_impl(spreading_factor, header, payload_len, cr, crc, dw_size, low_data_rate, beta, fft_factor, peak_search_algorithm, peak_search_phase_k, fs_bw_ratio));
     }
 
     /*
@@ -63,6 +64,7 @@ namespace gr {
                             uint8_t   payload_len,
                             uint8_t   cr,
                             bool      crc,
+                            uint8_t   dw_size,
                             bool      low_data_rate,
                             float     beta,
                             uint16_t  fft_factor,
@@ -82,6 +84,7 @@ namespace gr {
         d_payload_len(payload_len),
         d_cr(cr),
         d_crc(crc),
+        d_dw_size(dw_size),
         d_ldr(low_data_rate),
         d_beta(beta),
         d_fft_size_factor(fft_factor),
@@ -121,11 +124,17 @@ namespace gr {
       d_window = fft::window::build(fft::window::WIN_KAISER, d_num_samples, d_beta);
 
       // Create local chirp tables.  Each table is 2 chirps long to allow memcpying from arbitrary offsets.
+      // 生成 d_downchirp 和 d_upchirp，这里用的方法是离散时间的LoRa公式
       for (int i = 0; i < d_num_samples; i++) {
         double phase = M_PI/d_p*(i-i*i/(float)d_num_samples);
         d_downchirp.push_back(gr_complex(std::polar(1.0, phase)));
         d_upchirp.push_back(gr_complex(std::polar(1.0, -phase)));
       }
+      // for (int i =0; i < d_num_samples*d_dw_size; ++i)
+      // {
+      //   double phase = M_PI/d_p*  
+      // }
+
       set_history(DEMOD_HISTORY_DEPTH*d_num_samples);  // Sync is 2.25 chirp periods long
     }
 
@@ -258,7 +267,32 @@ namespace gr {
         #endif
       }
     }
+    void
+    demod_impl::dechirp(bool is_up,
+                        const gr_complex *in,
+                        gr_complex *block,
+                        uint8_t dw_size,
+                        float *fft_mag,
+                        float *fft_add)
+    {
+      if (is_up) {
+        volk_32fc_x2_multiply_32fc(block, in, &d_downchirp[0], d_num_samples);
+      }
+      else {
+        volk_32fc_x2_multiply_32fc(block, in, &d_upchirp[0], d_num_samples);
+      }
 
+      memset(d_fft->get_inbuf(),            0, d_fft_size*sizeof(gr_complex));
+      memcpy(d_fft->get_inbuf(), &block[0], d_num_samples*sizeof(gr_complex));
+      d_fft->execute();
+      volk_32fc_magnitude_32f(fft_mag, d_fft->get_outbuf(), d_fft_size);
+      volk_32f_x2_add_32f(fft_add, fft_mag, &fft_mag[d_fft_size-d_bin_size], d_bin_size);
+      #if DEBUG >= DEBUG_VERBOSE
+        float max_val = 0;
+        uint32_t max_idx = gr::lora::argmax_32f(fft_add, &max_val, d_bin_size);
+        std::cout << "[dechirp] max_idx: " << max_idx << ", max_val: " << max_val << std::endl;
+      #endif
+    }
     void
     demod_impl::dynamic_compensation(std::vector<uint16_t>& compensated_symbols)
     {

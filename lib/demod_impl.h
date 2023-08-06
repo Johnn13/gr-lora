@@ -45,6 +45,7 @@ namespace gr {
       demod_state_t d_state;
       uint8_t d_sf;
       uint8_t d_cr;
+      uint8_t d_dw_size;
       uint8_t d_payload_len;
       bool d_crc;
       bool d_ldr;
@@ -92,6 +93,7 @@ namespace gr {
                   uint8_t   payload_len,
                   uint8_t   cr,
                   bool      crc,
+                  uint8_t   dw_size,
                   bool      low_data_rate,
                   float     beta,
                   uint16_t  fft_factor,
@@ -110,6 +112,13 @@ namespace gr {
       void dynamic_compensation(std::vector<uint16_t>& compensated_symbols);
       
       void parse_header(pmt::pmt_t dict);
+    
+      void dechirp(bool is_up,
+                            const gr_complex *in,
+                            gr_complex *up_block,
+                            uint8_t dw_size,
+                            float *fft_mag,
+                            float *fft_add);
 
       // Where all the action really happens
       void forecast (int noutput_items, gr_vector_int &ninput_items_required);

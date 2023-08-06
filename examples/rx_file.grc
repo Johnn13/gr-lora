@@ -68,6 +68,18 @@ blocks:
     coordinate: [801, 12]
     rotation: 180
     state: enabled
+- name: dw_size
+  id: variable
+  parameters:
+    comment: ''
+    value: '1'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [576, 120.0]
+    rotation: 0
+    state: true
 - name: freq
   id: variable
   parameters:
@@ -245,7 +257,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1081, 263]
+    coordinate: [1024, 396.0]
     rotation: 0
     state: true
 - name: lora_demod_1
@@ -254,9 +266,10 @@ blocks:
     affinity: ''
     alias: ''
     beta: '25.0'
-    code_rate: cr
+    code_rate: '1'
     comment: ''
     crc: crc
+    dw_size: dw_size
     fft_factor: '8'
     fs_bw_ratio: '2'
     header: header
@@ -271,7 +284,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [773, 103]
+    coordinate: [760, 172.0]
     rotation: 0
     state: true
 - name: low_pass_filter_0
@@ -323,9 +336,7 @@ blocks:
 connections:
 - [blocks_file_source_0, '0', low_pass_filter_0, '0']
 - [lora_decode_0, header, lora_demod_1, header]
-- [lora_decode_0, out, blocks_message_debug_0, print_pdu]
 - [lora_decode_0, out, blocks_socket_pdu_0, pdus]
-- [lora_demod_1, out, blocks_message_debug_0_0, print]
 - [lora_demod_1, out, lora_decode_0, in]
 - [low_pass_filter_0, '0', pfb_arb_resampler_xxx_0, '0']
 - [pfb_arb_resampler_xxx_0, '0', lora_demod_1, '0']

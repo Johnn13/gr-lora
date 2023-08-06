@@ -71,6 +71,7 @@ namespace gr {
                         uint8_t   payload_len,
                         uint8_t   cr,
                         bool      crc,
+                        uint8_t   dw_size,
                         bool      low_data_rate,
                         float     beta,
                         uint16_t  fft_factor,

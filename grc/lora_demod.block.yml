@@ -25,6 +25,10 @@ parameters:
     label: CRC
     dtype: bool
     default: 'True'
+-   id: dw_size
+    label: dw size
+    dtype: int
+    default: '1'
 -   id: low_data_rate
     label: Low Data Rate
     dtype: bool
@@ -64,7 +68,7 @@ outputs:
 templates:
     imports: import lora
     make: lora.demod(${spreading_factor}, ${header}, ${payload_len}, ${code_rate},
-        ${crc}, ${low_data_rate}, ${beta}, ${fft_factor}, ${peak_search_algorithm},
+        ${crc}, ${dw_size}, ${low_data_rate}, ${beta}, ${fft_factor}, ${peak_search_algorithm},
         ${peak_search_phase_k}, ${fs_bw_ratio})
 
 file_format: 1
