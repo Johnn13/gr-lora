@@ -27,10 +27,16 @@
 
 #define DEBUG_OFF     0
 #define DEBUG_INFO    1
-#define DEBUG_VERBOSE 2
+#define DEBUG_VERBOSE 0
 #define DEBUG         DEBUG_OFF
 
 #define DUMP_IQ       0
+
+#define DEBUG_REF     0
+#define DEBUG_DECHIRP 0
+#define DEBUG_PREAMBLE_FFT     0
+#define DEBUG_FFT_MAG 0
+#define DEBUG_PREAMBLE_IQ 1
 
 #define OVERLAP_DEFAULT 1
 #define OVERLAP_FACTOR  16
@@ -77,8 +83,15 @@ namespace gr {
         f_raw("raw.out", std::ios::out),
         f_fft("fft.out", std::ios::out),
         f_up_windowless("up_windowless.out", std::ios::out),
-        f_up("up.out", std::ios::out),
-        f_down("down.out", std::ios::out),
+        f_up("f_up.out", std::ios::out),
+        f_down("f_down.out", std::ios::out),
+        f_ref_up("ref_upchirp.out",std::ios::binary),
+        f_ref_down("ref_downchirp.out",std::ios::binary),
+        f_dechirp_up("f_dechirp_up.out", std::ios::out),
+        f_dechirp_down("f_dechirp_down.out", std::ios::out),
+        f_fft_up("f_fft_up.out", std::ios::out),
+        f_fft_down("f_fft_down.out", std::ios::out),
+        f_fft_iq("f_preamble_iq.out", std::ios::out),
         d_sf(spreading_factor),
         d_header(header),
         d_payload_len(payload_len),
@@ -123,6 +136,19 @@ namespace gr {
 
       d_window = fft::window::build(fft::window::WIN_KAISER, d_num_samples, d_beta);
 
+      d_window_large = fft::window::build(fft::window::WIN_KAISER, d_num_samples+d_dw_size, d_beta);
+
+      pattern = {0,1,0,1,0,1};
+      
+      // generating ref_pattern_bin_list using pattern
+      ref_upchirp_bin = 1/(d_num_symbols)/d_fft_size_factor;
+      ref_downchirp_bin = 3/(d_num_symbols)/d_fft_size_factor;
+      for (auto i : pattern)
+      {
+        float ref_bin = i==0 ? ref_upchirp_bin : ref_downchirp_bin;
+        ref_pattern_bin_list.insert(ref_pattern_bin_list.begin(),ref_bin);
+      }
+      
       // Create local chirp tables.  Each table is 2 chirps long to allow memcpying from arbitrary offsets.
       // 生成 d_downchirp 和 d_upchirp，这里用的方法是离散时间的LoRa公式
       for (int i = 0; i < d_num_samples; i++) {
@@ -130,10 +156,21 @@ namespace gr {
         d_downchirp.push_back(gr_complex(std::polar(1.0, phase)));
         d_upchirp.push_back(gr_complex(std::polar(1.0, -phase)));
       }
-      // for (int i =0; i < d_num_samples*d_dw_size; ++i)
-      // {
-      //   double phase = M_PI/d_p*  
-      // }
+      
+      // 生成的 ref_upchirp 和 down_chirp 比原来的 d_upchirp/d_downchirp 持续时间*2,斜率不变
+      // eg. bw*2,sf+2
+      for (int i =0; i < d_num_samples*2; ++i)
+      {
+        double phase = M_PI/d_p*(2*i-i*i/(float)d_num_samples);
+        ref_downchirp.push_back(gr_complex(std::polar(1.0, phase)));
+        ref_upchirp.push_back(gr_complex(std::polar(1.0, -phase)));
+      }
+      #if DEBUG_REF
+        for (auto& i : ref_downchirp)
+          f_ref_down.write(reinterpret_cast<char*>(&i), sizeof(i));
+        for (auto& i : ref_upchirp)
+          f_ref_up.write(reinterpret_cast<char*>(&i), sizeof(i));
+      #endif
 
       set_history(DEMOD_HISTORY_DEPTH*d_num_samples);  // Sync is 2.25 chirp periods long
     }
@@ -166,6 +203,7 @@ namespace gr {
       *max_val_p = max_val;
       return max_idx;
     }
+
 
     uint32_t
     demod_impl::search_fft_peak(const lv_32fc_t *fft_result,
@@ -275,23 +313,206 @@ namespace gr {
                         float *fft_mag,
                         float *fft_add)
     {
+      // block : 存放 sig*base upchirp/downchirp 的结果
+      // fft_mag : 存放 fft 结果的幅值
+      // fft_add : 将 fft 结果
       if (is_up) {
-        volk_32fc_x2_multiply_32fc(block, in, &d_downchirp[0], d_num_samples);
+        volk_32fc_x2_multiply_32fc(block, in, &ref_downchirp[0], d_num_samples*2);
       }
       else {
-        volk_32fc_x2_multiply_32fc(block, in, &d_upchirp[0], d_num_samples);
+        volk_32fc_x2_multiply_32fc(block, in, &ref_upchirp[0], d_num_samples*2);
+      }
+      
+      // memset 用0填充d_fft的输入缓冲区 get_inbuf() d_fft_size 是d_num_samples的zero-padding
+      memset(d_fft->get_inbuf(),            0, d_fft_size*dw_size*sizeof(gr_complex));
+      memcpy(d_fft->get_inbuf(), &block[0], d_num_samples*dw_size*sizeof(gr_complex));
+      d_fft->execute();
+      volk_32fc_magnitude_32f(fft_mag, d_fft->get_outbuf(), d_fft_size*dw_size); // 计算 d_fft->get_outbuf()的幅值，保存到 fft_mag 中
+      volk_32f_x2_add_32f(fft_add, fft_mag, &fft_mag[d_fft_size*dw_size-d_bin_size*dw_size], d_bin_size*dw_size);
+      // #if DEBUG >= DEBUG_VERBOSE
+        float max_val = 0;
+        uint32_t max_idx = gr::lora::argmax_32f(fft_add, &max_val, d_bin_size*dw_size);
+        std::cout << "[new dechirp] max_idx: " << max_idx << ", max_val: " << max_val << std::endl;
+      // #endif
+    }
+
+    /* 
+      function : dechirp in preamble part
+      parameters :
+        in : input sample 
+        fft_res_up : return fft result by res_upchirp
+        fft_res_down : return fft result by res_downchirp
+        fft result form : [fft_max_mag fft_indx]
+          eg. [-1 -1] no peak
+     */
+    std::vector<uint32_t> demod_impl::preamble_dechirp(const gr_complex *in)
+    {
+      /*
+        de_res_up 用于存放使用 ref_upchirp 进行dechirp的结果；
+        de_res_down 用于存放使用 ref_downchirp 进行dechirp的结果
+      */
+      gr_complex *de_res_up = (gr_complex *)volk_malloc(d_fft_size*2*sizeof(gr_complex), volk_get_alignment());
+      gr_complex *de_res_down = (gr_complex *)volk_malloc(d_fft_size*2*sizeof(gr_complex), volk_get_alignment());
+      gr_complex *de_res_up_w = (gr_complex *)volk_malloc(d_fft_size*2*sizeof(gr_complex), volk_get_alignment());
+      gr_complex *de_res_down_w = (gr_complex *)volk_malloc(d_fft_size*2*sizeof(gr_complex), volk_get_alignment());
+      float *fft_mag_up = (float*)volk_malloc(d_fft_size*2*sizeof(float), volk_get_alignment());
+      float *fft_mag_up_w = (float*)volk_malloc(d_fft_size*2*sizeof(float), volk_get_alignment());
+      float *fft_mag_down = (float*)volk_malloc(d_fft_size*2*sizeof(float), volk_get_alignment());
+      float *fft_mag_down_w = (float*)volk_malloc(d_fft_size*2*sizeof(float), volk_get_alignment());
+
+      if (de_res_up == NULL ||
+          de_res_down == NULL ||
+          de_res_up_w == NULL ||
+          de_res_down_w == NULL ||
+          fft_mag_up == NULL ||
+          fft_mag_down == NULL ||
+          fft_mag_up_w == NULL ||
+          fft_mag_down_w == NULL
+      )
+      {
+        std::cerr << "Unable to allocate processing buffer!" << std::endl;
       }
 
-      memset(d_fft->get_inbuf(),            0, d_fft_size*sizeof(gr_complex));
-      memcpy(d_fft->get_inbuf(), &block[0], d_num_samples*sizeof(gr_complex));
-      d_fft->execute();
-      volk_32fc_magnitude_32f(fft_mag, d_fft->get_outbuf(), d_fft_size);
-      volk_32f_x2_add_32f(fft_add, fft_mag, &fft_mag[d_fft_size-d_bin_size], d_bin_size);
-      #if DEBUG >= DEBUG_VERBOSE
-        float max_val = 0;
-        uint32_t max_idx = gr::lora::argmax_32f(fft_add, &max_val, d_bin_size);
-        std::cout << "[dechirp] max_idx: " << max_idx << ", max_val: " << max_val << std::endl;
+      // #if DEBUG_PREAMBLE_IQ
+      //   f_fft_iq.write((const char*)&in[0], d_num_samples*2*sizeof(gr_complex));
+      // #endif
+      // Dechirp the incoming signal using longer base up/down-chirp
+      volk_32fc_x2_multiply_32fc(de_res_up, in, &ref_upchirp[0], d_num_samples*2);
+      volk_32fc_x2_multiply_32fc(de_res_down, in, &ref_downchirp[0], d_num_samples*2);
+      #if DEBUG_DECHIRP
+        f_dechirp_up.write((const char*)&de_res_up[0], d_num_samples*2*sizeof(gr_complex));
+        f_dechirp_down.write((const char*)&de_res_down[0], d_num_samples*2*sizeof(gr_complex));
       #endif
+
+      // 对dechirp后的信号进行加窗（KAISER窗）
+      // volk_32fc_32f_multiply_32fc(de_res_up_w, de_res_up, &d_window_large[0], d_num_samples*2);
+      // volk_32fc_32f_multiply_32fc(de_res_down_w, de_res_down, &d_window_large[0], d_num_samples*2);
+
+      /* 
+        FFT in Preamble Part 
+        If d_fft_size_factor is greater than 1, the rest of the sample buffer will be zeroed out and blend into the window
+        fft result magnitude summation by volk_32fc_magnitude_32f function
+        volk_32fc_magnitude_32f : 计算复数的幅值,并将结果存储在第一个参数中
+        volk_32f_x2_add_32f : 将两个向量(第二个参数+第三个参数)逐元素相加,并将结果存储在第一个参数中 
+
+        Variables Description : 
+          de_res_up : dechirped signal by res_chirp_up
+          de_res_down : dechirped signal by res_chirp_down
+          fft_mag_up : de_res_up fft magnitude result
+          fft_mag_down : de_res_down fft magnitude result
+          Variables with w are the above variables corresponding windowed versions
+      */
+      // 当 d_fft_size > d_num_samples 时，采用Zero-padding
+      memset(d_fft->get_inbuf(),            0, d_fft_size*2*sizeof(gr_complex));
+      memcpy(d_fft->get_inbuf(), &de_res_up[0], d_num_samples*2*sizeof(gr_complex));
+      d_fft->execute();
+      volk_32fc_magnitude_32f(fft_mag_up, d_fft->get_outbuf(), d_fft_size*2);
+      #if DEBUG_FFT_MAG
+        for (int i = 0; i < d_fft_size*2; ++i)
+        {
+          if( (fft_mag_up[i] < std::numeric_limits<float>::min()) || ( fft_mag_up[i] > std::numeric_limits<float>::max() ) )
+            printf("the value is inf or -inf\n");
+          f_fft_up << fft_mag_up[i] << std::endl;
+          f_fft_down << fft_mag_down[i] << std::endl;
+          // f_fft_up.write(reinterpret_cast<char*>(&fft_mag_up[i]), sizeof(float));
+          // f_fft_down.write(reinterpret_cast<char*>(&fft_mag_down[i]), sizeof(float));
+        }
+            
+      #endif
+
+      #if DEBUG_PREAMBLE_FFT
+        f_fft_up.write((const char*)fft_mag_up, d_fft_size*2*sizeof(gr_complex));
+      #endif
+
+      memset(d_fft->get_inbuf(),            0, d_fft_size*2*sizeof(gr_complex));
+      memcpy(d_fft->get_inbuf(), &de_res_down[0], d_num_samples*2*sizeof(gr_complex));
+      d_fft->execute();
+      volk_32fc_magnitude_32f(fft_mag_down, d_fft->get_outbuf(), d_fft_size*2);
+
+      #if DEBUG_PREAMBLE_FFT
+        f_fft_down.write((const char*)d_fft->get_outbuf(), d_fft_size*2*sizeof(gr_complex));
+      #endif
+      // apply FFT on windowed signal
+      // memset(d_fft->get_inbuf(),              0, d_fft_size*2*sizeof(gr_complex));
+      // memcpy(d_fft->get_inbuf(), &de_res_up_w[0], d_num_samples*2*sizeof(gr_complex));
+      // d_fft->execute();
+      // volk_32fc_magnitude_32f(fft_mag_up_w, d_fft->get_outbuf(), d_fft_size*2);
+
+      // memset(d_fft->get_inbuf(),              0, d_fft_size*2*sizeof(gr_complex));
+      // memcpy(d_fft->get_inbuf(), &de_res_down_w[0], d_num_samples*2*sizeof(gr_complex));
+      // d_fft->execute();
+      // volk_32fc_magnitude_32f(fft_mag_down_w, d_fft->get_outbuf(), d_fft_size*2);
+
+      float       *stddev = (float*)volk_malloc(sizeof(float), volk_get_alignment());
+      float       *mean = (float*)volk_malloc(sizeof(float), volk_get_alignment());
+      float       threshold;
+      bool is_Outlier_up = false;
+      bool is_Outlier_down = false;
+      std::vector<float>   pk_up{-1,-1};
+      std::vector<float>   pk_down{-1,-1};
+      std::vector<uint32_t> pk;
+      // 1. get Outlier threshold
+      volk_32f_stddev_and_mean_32f_x2(stddev, mean, fft_mag_up,d_fft_size*2);
+      threshold = *mean + 5*(*stddev);
+      std::cout << "up threshold :" << threshold << std::endl;
+      // 2. peak extract  
+      // using upchirp, peak range[-bw,0]
+      float max_val_up = 0;
+      uint32_t fft_max_idx_up = gr::lora::argmax_32f(fft_mag_up, &max_val_up, d_fft_size*2);
+      // volk_32f_index_max_32u(fft_max_idx_up,&fft_mag_up[d_fft_size],d_fft_size);
+      if(max_val_up > threshold)
+        is_Outlier_up = true;
+
+      volk_32f_stddev_and_mean_32f_x2(stddev, mean, fft_mag_down,d_fft_size*2);
+      threshold = *mean + 5*(*stddev);
+      std::cout << "down threshold :" << threshold << std::endl;
+      // for downchirp, peak range[0,bw]
+      float max_val_down = 0;
+      uint32_t fft_max_idx_down = gr::lora::argmax_32f(fft_mag_down, &max_val_down, d_fft_size*2);
+      // volk_32f_index_max_32u(fft_max_idx_down,fft_mag_down,d_fft_size);
+      if(max_val_down > threshold)
+        is_Outlier_down = true;
+      // if(is_Outlier_up == is_Outlier_down)
+      // {
+      //   // pk_up[0] = max_val_down;
+      //   // pk_up[1] = static_cast<float>(fft_max_idx_down);
+      //   // pk_down[0] = max_val_up;
+      //   // pk_down[1] = fft_max_idx_up;
+      //   pk = {fft_max_idx_down,fft_max_idx_up};
+      // }
+      if (!is_Outlier_up && is_Outlier_down)
+      {
+        /* 
+          如果在down-demodulation window 中存在离群点
+          在 up-demodulation window 中不存在离群点
+          则此时解调窗口存在两个upchirp，
+          如果则合法的peak应该出现在[0,B/2)处
+        */
+        fft_max_idx_down = gr::lora::argmax_32f(fft_mag_down, &max_val_down, d_fft_size/2);
+      }
+      if(is_Outlier_up && !is_Outlier_down)
+      {
+        /* 
+          如果在up-demodulation window 中存在离群点
+          在 down-demodulation window 中不存在离群点
+          则此时解调窗口存在两个downchirp，
+          如果则合法的peak应该出现在[3B/2,2B]处
+        */
+        fft_max_idx_up = gr::lora::argmax_32f(&fft_mag_up[3*d_fft_size/2], &max_val_up, d_fft_size/2);
+      }
+      pk = {fft_max_idx_down,fft_max_idx_up};
+
+      volk_free(de_res_up);
+      volk_free(de_res_down);
+      volk_free(de_res_up_w);
+      volk_free(de_res_down_w);
+      volk_free(fft_mag_up);
+      volk_free(fft_mag_up_w);
+      volk_free(fft_mag_down);
+      volk_free(fft_mag_down_w);
+      volk_free(stddev);
+      volk_free(mean);
+      return pk;
     }
     void
     demod_impl::dynamic_compensation(std::vector<uint16_t>& compensated_symbols)
@@ -329,10 +550,13 @@ namespace gr {
                        gr_vector_const_void_star &input_items,
                        gr_vector_void_star &output_items)
     {
-      if (ninput_items[0] < DEMOD_HISTORY_DEPTH*d_num_samples) return 0;
-      const gr_complex *in0 = (const gr_complex *) input_items[0];
-      const gr_complex *in  = &in0[(DEMOD_HISTORY_DEPTH-1)*d_num_samples];
-      uint32_t  *out    = (uint32_t   *) output_items[0];
+      // if (ninput_items[0] < DEMOD_HISTORY_DEPTH*d_num_samples) return 0;
+      // in0 在前面，in 在后面
+      // const gr_complex *in0 = (const gr_complex *) input_items[0];
+      // const gr_complex *in  = &in0[(DEMOD_HISTORY_DEPTH-1)*d_num_samples];
+      if (ninput_items[0] < 4*d_num_samples) return 0;
+      const gr_complex *in = (const gr_complex *)  input_items[0];
+      // uint32_t  *out    = (uint32_t   *) output_items[0];
 
 
       uint32_t num_consumed   = d_num_samples;
@@ -360,7 +584,20 @@ namespace gr {
 
       // Dechirp the incoming signal
       volk_32fc_x2_multiply_32fc(up_block, in, &d_downchirp[0], d_num_samples);
-
+      #if DEBUG_PREAMBLE_IQ
+        f_fft_iq.write((const char*)&in[0], d_num_samples*sizeof(gr_complex));
+      #endif
+      std::vector<uint32_t> pk = preamble_dechirp(in);      // 前插法，有利于后面直接用 pop_back 弹出第一个元素
+      std::cout << "pk :";
+      for (auto i : pk)
+          std::cout << i << " ";
+      std::cout << std::endl;
+      preamble_pk_list.insert(preamble_pk_list.begin(), pk);
+      if (preamble_pk_list.size() > REQUIRED_PREAMBLE_LEN)
+      {
+        preamble_pk_list.pop_back();
+      }
+      
       if (d_state == S_SFD_SYNC)
       {
         volk_32fc_x2_multiply_32fc(down_block, in, &d_upchirp[0], d_num_samples);
@@ -405,6 +642,8 @@ namespace gr {
         d_offset = 0;
         d_symbols.clear();
         d_argmax_history.clear();
+        preamble_pk_list.clear();
+        pattern_bin_list.clear();
         d_sfd_history.clear();
         d_sync_recovery_counter = 0;
         d_header_received = false;
@@ -422,7 +661,7 @@ namespace gr {
 
       case S_PREFILL:
       {
-        if (d_argmax_history.size() >= REQUIRED_PREAMBLE_CHIRPS)
+        if (preamble_pk_list.size() >= REQUIRED_PREAMBLE_LEN)
         {
           d_state = S_DETECT_PREAMBLE;
 
@@ -438,41 +677,49 @@ namespace gr {
 
       case S_DETECT_PREAMBLE:
       {
-        d_preamble_idx = d_argmax_history[0];
-
-        #if DEBUG >= DEBUG_VERBOSE
-          std::cout << "PREAMBLE " << d_argmax_history[0] << std::endl;
-        #endif
-
+        // get pattern_bin_list
+        
+        for (int i = 0; i < pattern.size(); ++i)
+          pattern_bin_list.insert(pattern_bin_list.begin(),preamble_pk_list[i][pattern[i]]);
+        for (auto i : pattern_bin_list)
+          std::cout << i << " ";
+        std::cout << std::endl;
         // Check for discontinuities that exceed some tolerance
         preamble_found = true;
-        for (int i = 1; i < REQUIRED_PREAMBLE_CHIRPS; i++)
-        {
-          // 只需要 d_argmax_history 数组中的元素与d_argmax_history[0]相差在dis之内即可
-          uint32_t dis = gr::lora::pmod(int(d_preamble_idx) - int(d_argmax_history[i]), d_bin_size);
-          if (dis > d_preamble_drift_max && dis < d_bin_size-d_preamble_drift_max)
-          {
-            preamble_found = false;
-          }
-        }
+        std::vector<u_int32_t> dis(pattern_bin_list.size());
+        std::vector<u_int32_t> diff;
+        std::transform(pattern_bin_list.begin(), pattern_bin_list.end(), 
+                 ref_pattern_bin_list.begin(), dis.begin(),
+                 [](u_int32_t a, u_int32_t b){ return (a >= b) ? (a - b) : (a + (0xFFFFFFFF - b) + 1); });
+        std::adjacent_difference(dis.begin(), dis.end(), 
+                std::back_inserter(diff));
 
-        // Advance to SFD/sync discovery if a contiguous preamble is found
+        auto iter = std::find_if(diff.begin(), diff.end(), 
+                  [&](u_int32_t x){return x > d_fft_size_factor*2;});
+
+        // 判断找到结果                        
+        if (iter != diff.end()) 
+        {
+          preamble_found = false;
+          // std::cout << "Found value greater than " << d_fft_size_factor << "\n";
+        } 
         if (preamble_found)
         {
           d_state = S_SFD_SYNC;
-
-          // move preamble peak to bin zero
-          num_consumed = d_num_samples - d_p*d_preamble_idx/d_fft_size_factor;
-
-          #if DEBUG >= DEBUG_INFO
-            std::cout << "Next state: S_SFD_SYNC" << std::endl;
-          #endif
+          std::cout << "Preamble detected!" << std::endl;
         }
+        else
+        {
+          std::cout << "No Preamble!" << std::endl;
+        }
+        #if DEBUG >= DEBUG_INFO
+          std::cout << "Next state: S_SFD_SYNC" << std::endl;
+        #endif
+        pattern_bin_list.clear();
+        dis.clear();
+        diff.clear();
         break;
       }
-
-
-
       // Accurately synchronize to the SFD by computing overlapping FFTs of the downchirp/SFD IQ stream
       // Effectively increases FFT's time-based resolution, allowing for a better sync
       case S_SFD_SYNC:
@@ -518,9 +765,9 @@ namespace gr {
           num_consumed = (int)round(2.25*d_num_samples + d_p*idx/2.0/d_fft_size_factor);
 
           // refine CFO
-          volk_32fc_x2_multiply_32fc(up_block, 
-            &in0[(int)round((DEMOD_HISTORY_DEPTH-1-5.25)*d_num_samples) + num_consumed],
-            &d_downchirp[0], d_num_samples);
+          // volk_32fc_x2_multiply_32fc(up_block, 
+          //   &in0[(int)round((DEMOD_HISTORY_DEPTH-1-5.25)*d_num_samples) + num_consumed],
+          //   &d_downchirp[0], d_num_samples);
           memset(d_fft->get_inbuf(),        0, d_fft_size*sizeof(gr_complex));
           memcpy(d_fft->get_inbuf(), up_block, d_num_samples*sizeof(gr_complex));
           d_fft->execute();
@@ -653,6 +900,7 @@ namespace gr {
       #endif
 
       consume_each (num_consumed);
+      std::cout << num_consumed << std::endl;
 
       volk_free(down_block);
       volk_free(up_block);

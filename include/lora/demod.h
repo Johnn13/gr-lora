@@ -27,6 +27,7 @@
 
 #define DEMOD_HISTORY_DEPTH        7
 #define REQUIRED_PREAMBLE_CHIRPS   4
+#define REQUIRED_PREAMBLE_LEN      6
 #define REQUIRED_SFD_CHIRPS        2
 #define LORA_SFD_TOLERANCE         1
 #define LORA_PREAMBLE_TOLERANCE    1

@@ -8,7 +8,7 @@ options:
     description: ''
     gen_cmake: 'On'
     gen_linking: dynamic
-    generate_options: no_gui
+    generate_options: qt_gui
     hier_block_src_path: '.:'
     id: rx_usrp
     max_nouts: '0'
@@ -72,7 +72,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: 868e6
+    value: 470e6
   states:
     bus_sink: false
     bus_source: false
@@ -120,12 +120,12 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: 1e6
+    value: 500e3
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [242, 12]
+    coordinate: [192, 24.0]
     rotation: 0
     state: enabled
 - name: sf
@@ -147,7 +147,7 @@ blocks:
     alias: ''
     append: 'False'
     comment: ''
-    file: /home/jm/ideal_signal/470_sf10_fs250_bw250_cr1_hascrc_hasheader.cfile
+    file: /home/jm/ideal_signal/ctos_netid.cfile
     type: complex
     unbuffered: 'False'
     vlen: '1'
@@ -203,7 +203,7 @@ blocks:
     bus_structure: null
     coordinate: [1363, 381]
     rotation: 0
-    state: enabled
+    state: disabled
 - name: lora_decode_0
   id: lora_decode
   parameters:
@@ -224,7 +224,7 @@ blocks:
     bus_structure: null
     coordinate: [1088, 280]
     rotation: 0
-    state: enabled
+    state: disabled
 - name: lora_demod_0
   id: lora_demod
   parameters:
@@ -234,6 +234,7 @@ blocks:
     code_rate: cr
     comment: ''
     crc: crc
+    dw_size: '1'
     fft_factor: '16'
     fs_bw_ratio: '2'
     header: header
@@ -250,7 +251,7 @@ blocks:
     bus_structure: null
     coordinate: [806, 116]
     rotation: 0
-    state: enabled
+    state: disabled
 - name: low_pass_filter_0
   id: low_pass_filter
   parameters:
@@ -274,7 +275,7 @@ blocks:
     bus_structure: null
     coordinate: [316, 137]
     rotation: 0
-    state: enabled
+    state: disabled
 - name: pfb_arb_resampler_xxx_0
   id: pfb_arb_resampler_xxx
   parameters:
@@ -295,7 +296,7 @@ blocks:
     bus_structure: null
     coordinate: [488, 340]
     rotation: 0
-    state: enabled
+    state: disabled
 - name: qtgui_time_sink_x_0
   id: qtgui_time_sink_x
   parameters:
@@ -514,7 +515,7 @@ blocks:
     bus_structure: null
     coordinate: [432, 484.0]
     rotation: 0
-    state: disabled
+    state: enabled
 - name: uhd_usrp_source_0
   id: uhd_usrp_source
   parameters:
@@ -660,7 +661,7 @@ blocks:
     dc_offs_enb9: '""'
     dev_addr: ''
     dev_args: '""'
-    gain0: '60'
+    gain0: '20'
     gain1: '0'
     gain10: '0'
     gain11: '0'

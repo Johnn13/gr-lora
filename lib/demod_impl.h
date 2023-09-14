@@ -27,11 +27,13 @@
 #include <queue>
 #include <complex>
 #include <fstream>
+#include <numeric>
 #include <gnuradio/fft/fft.h>
 #include <gnuradio/fft/window.h>
 #include <volk/volk.h>
 #include "lora/demod.h"
 #include "utilities.h"
+
 
 namespace gr {
   namespace lora {
@@ -70,22 +72,36 @@ namespace gr {
       uint32_t d_preamble_idx;
       uint16_t d_sfd_idx;
       std::vector<uint32_t> d_argmax_history;
+      std::vector<std::vector<uint32_t>> preamble_pk_list;
       std::vector<uint16_t> d_sfd_history;
       uint16_t d_sync_recovery_counter;
 
       uint16_t d_peak_search_algorithm;
       uint16_t d_peak_search_phase_k;
 
+      std::vector<uint16_t> pattern;
+
       fft::fft_complex   *d_fft;
       std::vector<float> d_window;
+      std::vector<float> d_window_large;
       float              d_beta;
 
       std::vector<gr_complex> d_upchirp;
       std::vector<gr_complex> d_downchirp;
 
+      // 这两个 base up-/down-chirp 用来进行前导部分的detect
+      std::vector<gr_complex> ref_upchirp;
+      std::vector<gr_complex> ref_downchirp;
+
+      float ref_upchirp_bin;
+      float ref_downchirp_bin;
+      std::vector<uint32_t> ref_pattern_bin_list;
+      std::vector<uint32_t> pattern_bin_list;
+
       std::vector<float> d_symbols;
 
       std::ofstream f_raw, f_up_windowless, f_up, f_down, f_fft;
+      std::ofstream f_ref_up,f_ref_down,f_dechirp_up,f_dechirp_down,f_fft_up,f_fft_down,f_fft_iq;
 
      public:
       demod_impl( uint8_t   spreading_factor,
@@ -119,7 +135,8 @@ namespace gr {
                             uint8_t dw_size,
                             float *fft_mag,
                             float *fft_add);
-
+      
+      std::vector<uint32_t> preamble_dechirp(const gr_complex *in);
       // Where all the action really happens
       void forecast (int noutput_items, gr_vector_int &ninput_items_required);
 

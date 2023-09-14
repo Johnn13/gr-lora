@@ -10,7 +10,7 @@ options:
     gen_linking: dynamic
     generate_options: no_gui
     hier_block_src_path: '.:'
-    id: rx_usrp
+    id: rx_by_remote
     max_nouts: '0'
     output_language: python
     placement: (0,0)
@@ -72,7 +72,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '1'
+    value: '2'
   states:
     bus_sink: false
     bus_source: false
@@ -84,7 +84,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: 470e6
+    value: 868e6
   states:
     bus_sink: false
     bus_source: false
@@ -152,6 +152,24 @@ blocks:
     coordinate: [476, 12]
     rotation: 0
     state: enabled
+- name: blocks_file_sink_0
+  id: blocks_file_sink
+  parameters:
+    affinity: ''
+    alias: ''
+    append: 'False'
+    comment: ''
+    file: /home/jm/matlab_sig/in_iq.cfile
+    type: complex
+    unbuffered: 'False'
+    vlen: '1'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [760, 476.0]
+    rotation: 0
+    state: true
 - name: blocks_file_source_0
   id: blocks_file_source
   parameters:
@@ -159,7 +177,7 @@ blocks:
     alias: ''
     begin_tag: pmt.PMT_NIL
     comment: ''
-    file: /home/jm/ideal_signal/470_sf7_fs500_bw250_cr1_hascrc_hasheader.cfile
+    file: /home/jm/matlab_sig/ud_pre_packet.cfile
     length: '0'
     maxoutbuf: '0'
     minoutbuf: '0'
@@ -339,6 +357,7 @@ connections:
 - [lora_decode_0, out, blocks_socket_pdu_0, pdus]
 - [lora_demod_1, out, lora_decode_0, in]
 - [low_pass_filter_0, '0', pfb_arb_resampler_xxx_0, '0']
+- [pfb_arb_resampler_xxx_0, '0', blocks_file_sink_0, '0']
 - [pfb_arb_resampler_xxx_0, '0', lora_demod_1, '0']
 
 metadata:
