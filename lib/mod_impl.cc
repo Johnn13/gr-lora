@@ -14,14 +14,14 @@
  * 
  * You should have received a copy of the GNU General Public License
  * along with this software; see the file COPYING.  If not, write to
- * the Free Software Foundation, Inc., 51 Franklin Street,
+ * the Free Software FouFndation, Inc., 51 Franklin Street,
  * Boston, MA 02110-1301, USA.
  */
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
-
+#include <iostream>
 #include <gnuradio/io_signature.h>
 #include "mod_impl.h"
 
@@ -87,23 +87,40 @@ namespace gr {
 
       std::vector<gr_complex> iq_out;
 
-      // Preamble
-      for (int i = 0; i < NUM_PREAMBLE_CHIRPS*d_fft_size; i++)
-      {
-        iq_out.push_back(d_upchirp[(i) % d_fft_size]);
+      // Preamble Pattern -> Preamble 
+      std::vector<int> pattern{0,1,1,0,1,0};
+      for(int i = 0;i<pattern.size();i++) {
+        std::cout << pattern[i] << std::endl; 
+        if(pattern[i] == 0){
+          for(int j = 0;j<d_fft_size;j++) {
+            iq_out.push_back(d_upchirp[j]);
+          }
+        }
+        else{
+          for(int j = 0;j<d_fft_size;j++) {
+            iq_out.push_back(d_downchirp[j]);
+          }
+        }
       }
+      
+
+      // Preamble
+      // for (int i = 0; i < NUM_PREAMBLE_CHIRPS*d_fft_size; i++)
+      // {
+      //   iq_out.push_back(d_upchirp[(i) % d_fft_size]);
+      // }
 
       // Sync Word 0
-      for (int i = 0; i < d_fft_size; i++)
-      {
-        iq_out.push_back(d_upchirp[(8*((d_sync_word & 0xF0) >> 4) + i) % d_fft_size]);
-      }
+      // for (int i = 0; i < d_fft_size; i++)
+      // {
+      //   iq_out.push_back(d_upchirp[(8*((d_sync_word & 0xF0) >> 4) + i) % d_fft_size]);
+      // }
 
-      // Sync Word 1
-      for (int i = 0; i < d_fft_size; i++)
-      {
-        iq_out.push_back(d_upchirp[(8*(d_sync_word & 0x0F) + i) % d_fft_size]);
-      }
+      // // Sync Word 1
+      // for (int i = 0; i < d_fft_size; i++)
+      // {
+      //   iq_out.push_back(d_upchirp[(8*(d_sync_word & 0x0F) + i) % d_fft_size]);
+      // }
 
       // SFD Downchirps
       for (int i = 0; i < (2*d_fft_size+d_fft_size/4); i++)
@@ -121,7 +138,7 @@ namespace gr {
       }
 
       // Prepend zero-magnitude samples
-      d_iq_out.insert(d_iq_out.begin(), 4*d_fft_size, gr_complex(std::polar(0.0, 0.0)));
+      d_iq_out.insert(d_iq_out.begin(), 10*d_fft_size, gr_complex(std::polar(0.0, 0.0)));
 
       // Append samples to IQ output buffer
       for (int i = 0; i < iq_out.size(); i++)

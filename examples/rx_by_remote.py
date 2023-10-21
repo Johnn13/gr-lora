@@ -40,7 +40,7 @@ class rx_by_remote(gr.top_block):
         self.freq = freq = 868e6
         self.dw_size = dw_size = 2
         self.crc = crc = True
-        self.cr = cr = 1
+        self.cr = cr = 3
 
         ##################################################
         # Blocks
@@ -59,25 +59,22 @@ class rx_by_remote(gr.top_block):
                 1e3,
                 firdes.WIN_RECTANGULAR,
                 6.76))
-        self.lora_demod_1 = lora.demod(sf, header, payload_len, 1, crc, dw_size, ldr, 25.0, 8, 0, 4, 2)
+        self.lora_demod_old_0 = lora.Olddemod(sf, header, payload_len, cr, crc, False, 25.0, 10, 0, 4, 2)
         self.lora_decode_0 = lora.decode(sf, header, payload_len, cr, crc, ldr)
         self.blocks_socket_pdu_0 = blocks.socket_pdu('UDP_CLIENT', '127.0.0.1', '52002', 10000, False)
-        self.blocks_file_source_0 = blocks.file_source(gr.sizeof_gr_complex*1, '/home/jm/matlab_sig/ud_pre_packet.cfile', False, 0, 0)
+        self.blocks_file_source_0 = blocks.file_source(gr.sizeof_gr_complex*1, '/home/jm/matlab_sig/basic_lora_packet.cfile', False, 0, 0)
         self.blocks_file_source_0.set_begin_tag(pmt.PMT_NIL)
-        self.blocks_file_sink_0 = blocks.file_sink(gr.sizeof_gr_complex*1, '/home/jm/matlab_sig/in_iq.cfile', False)
-        self.blocks_file_sink_0.set_unbuffered(False)
 
 
         ##################################################
         # Connections
         ##################################################
         self.msg_connect((self.lora_decode_0, 'out'), (self.blocks_socket_pdu_0, 'pdus'))
-        self.msg_connect((self.lora_decode_0, 'header'), (self.lora_demod_1, 'header'))
-        self.msg_connect((self.lora_demod_1, 'out'), (self.lora_decode_0, 'in'))
+        self.msg_connect((self.lora_decode_0, 'header'), (self.lora_demod_old_0, 'header'))
+        self.msg_connect((self.lora_demod_old_0, 'out'), (self.lora_decode_0, 'in'))
         self.connect((self.blocks_file_source_0, 0), (self.low_pass_filter_0, 0))
         self.connect((self.low_pass_filter_0, 0), (self.pfb_arb_resampler_xxx_0, 0))
-        self.connect((self.pfb_arb_resampler_xxx_0, 0), (self.blocks_file_sink_0, 0))
-        self.connect((self.pfb_arb_resampler_xxx_0, 0), (self.lora_demod_1, 0))
+        self.connect((self.pfb_arb_resampler_xxx_0, 0), (self.lora_demod_old_0, 0))
 
 
     def get_sf(self):

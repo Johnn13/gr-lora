@@ -30,6 +30,7 @@ list(APPEND lora_sources
     decode_impl.cc
     encode_impl.cc
     weak_demod_impl.cc
+    Olddemod_impl.cc
 )
 
 set(lora_sources "${lora_sources}" PARENT_SCOPE)

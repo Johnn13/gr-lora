@@ -277,10 +277,15 @@ namespace gr
     void
     encode_impl::encode(pmt::pmt_t msg)
     {
-      pmt::pmt_t bytes(pmt::cdr(msg));
+      // pmt::pmt_t bytes(pmt::cdr(msg));  //wrong _data
 
-      size_t pkt_len(0);
-      const uint8_t *bytes_in_p = pmt::u8vector_elements(bytes, pkt_len);
+      // size_t pkt_len(0);
+      // const uint8_t *bytes_in_p = pmt::u8vector_elements(bytes, pkt_len);]
+      std::string str = pmt::symbol_to_string(msg);
+      char* token = (char*) str.data();
+      const uint8_t *bytes_in_p = (uint8_t*) token;
+
+      size_t pkt_len(str.size());
 
       std::vector<uint8_t> bytes_in(bytes_in_p, bytes_in_p + pkt_len);
       std::vector<uint8_t> nibbles;

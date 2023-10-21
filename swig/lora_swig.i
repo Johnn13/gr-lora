@@ -14,6 +14,7 @@
 #include "lora/decode.h"
 #include "lora/encode.h"
 #include "lora/weak_demod.h"
+#include "lora/Olddemod.h"
 %}
 
 %include "lora/demod.h"
@@ -28,3 +29,5 @@ GR_SWIG_BLOCK_MAGIC2(lora, decode);
 GR_SWIG_BLOCK_MAGIC2(lora, encode);
 %include "lora/weak_demod.h"
 GR_SWIG_BLOCK_MAGIC2(lora, weak_demod);
+%include "lora/Olddemod.h"
+GR_SWIG_BLOCK_MAGIC2(lora, Olddemod);
